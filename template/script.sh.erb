@@ -1,0 +1,88 @@
+#!/bin/bash
+
+CONTAINER_DIR="/cluster/tufts/apps/container/ai/images"
+CPU_CONTAINER="$CONTAINER_DIR/llama-server-cpu.sif"
+GPU_CONTAINER="$CONTAINER_DIR/llama-server-gpu.sif"
+
+# <% use_gpu = context.use_preset == "1" || context.gpu_preference != "none" %>
+# <% if context.use_preset == "1" %>
+#   <% n_cpu = context.resource_preset.split("/", 3).last.to_i %>
+#   <% n_cpu = n_cpu * context.preset_multiplier.to_i %>
+# <% else %>
+#   <% n_cpu = context.num_cores.to_i %>
+# <% end %>
+
+# <% if use_gpu %>
+CONTAINER="$GPU_CONTAINER"
+APPTAINER_FLAGS=(--nv)
+# <% else %>
+CONTAINER="$CPU_CONTAINER"
+APPTAINER_FLAGS=()
+# <% end %>
+
+# shellcheck disable=SC2154
+ARGS=(
+    --threads "<%= n_cpu %>"
+    --ctx-size "<%= context.ctx_size %>"
+    --n-predict "<%= context.n_predict %>"
+    --batch-size "<%= context.batch_size %>"
+    --ubatch-size "<%= context.ubatch_size %>"
+# <% if context.specify_rope == "1" %>
+    --rope-scaling "<%= context.rope_scaling %>"
+#   <% if context.rope_scaling != "none" %>
+#     <% if context.rope_scale.present? %>
+    --rope-scale "<%= context.rope_scale %>"
+#     <% end %>
+#     <% if context.rope_freq_base.present? %>
+    --rope-freq-base "<%= context.rope_freq_base %>"
+#     <% end %>
+#     <% if context.rope_scaling == "yarn" && context.specify_yarn == "1" %>
+#       <% if context.yarn_orig_ctx.present? %>
+    --yarn-orig-ctx "<%= context.yarn_orig_ctx %>"
+#       <% end %>
+#       <% if context.yarn_ext_factor.present? %>
+    --yarn-ext-factor "<%= context.yarn_ext_factor %>"
+#       <% end %>
+#       <% if context.yarn_attn_factor.present? %>
+    --yarn-attn-factor "<%= context.yarn_attn_factor %>"
+#       <% end %>
+#       <% if context.yarn_beta_slow.present? %>
+    --yarn-beta-slow "<%= context.yarn_beta_slow %>"
+#       <% end %>
+#       <% if context.yarn_beta_fast.present? %>
+    --yarn-beta-fast "<%= context.yarn_beta_fast %>"
+#       <% end %>
+#     <% end %>
+#   <% end %>
+# <% end %>
+# <% if context.kv_offload == "1" %>
+    --kv-offload
+# <% else %>
+    --no-kv-offload
+# <% end %>
+    --cache-type-k "<%= context.cache_type_k %>"
+    --cache-type-v "<%= context.cache_type_v %>"
+# <% gpu_layers = context.gpu_layers == "manual" ? context.n_gpu_layers : context.gpu_layers %>
+    --gpu-layers "<%= gpu_layers %>"
+    --offline
+    --port "$port"
+    --api-key "$password"
+# <% if context.use_router == "0" %>
+    --model "<%= context.model_file %>"
+#   <% if context.mmproj_file.present? %>
+    --mmproj "<%= context.mmproj_file %>"
+#   <% end %>
+# <% elsif context.use_router == "1" %>
+#   <% if context.models_dir.present? %>
+    --models-dir "<%= context.models_dir %>"
+#   <% end %>
+#   <% if context.models_ini.present? %>
+    --models-preset "<%= context.models_ini %>"
+#   <% end %>
+# <% end %>
+)
+
+module purge
+module load apptainer
+
+apptainer run "${APPTAINER_FLAGS[@]}" "$CONTAINER" "${ARGS[@]}"

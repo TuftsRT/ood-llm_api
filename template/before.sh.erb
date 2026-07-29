@@ -1,0 +1,7 @@
+#! /bin/bash
+export output_log="<%= session.staged_root.join('output.log') %>"
+export password="<%= context.api_key %>"
+export use_router="<%= context.use_router %>"
+export model_file="<%= context.model_file %>"
+port="$(find_port)"
+export port
