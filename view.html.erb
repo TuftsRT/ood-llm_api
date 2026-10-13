@@ -1,132 +1,115 @@
-<div class="alert alert-warning">
-  <strong>Usage Disclaimer:</strong> AI-generated content may be incorrect,
-  biased, incomplete, or misleading. Always review, verify, and edit AI
-  output before use. Before uploading data to any AI tool, please review the
-  <a href="https://it.tufts.edu/sites/default/files/uploaded-files/2018-09/information-classification-handling_2018-06-18_0.pdf"
-  target="_blank" rel="noopener">Tufts Information Classification and Handling Policy</a>
-  and the <a href="https://access.tufts.edu/data-finder" target="_blank" rel="noopener">Data Storage Finder</a>.
-  Do not enter any restricted data into the tool without formal TTS review.
-  For requirements and best practices, please refer to Tufts&rsquo;
-  <a href="https://it.tufts.edu/ai/guidance-using-ai-tufts" target="_blank" rel="noopener">Guidelines for Use of Generative AI Tools</a>.
-</div>
-<h5>How to use this application</h5>
-<p class="mb-2">
-  These values let you connect to an open-weights large language model (LLM)
-  from any software that uses an
-  <a href="https://github.com/openai/openai-openapi" target="_blank"
-  rel="noopener">OpenAI-compliant API</a>, including the OpenAI Python,
-  LangChain, curl, or Visual Studio extensions such as
-  <a href="https://continue.dev" target="_blank" rel="noopener">Continue.dev</a>
-  (see below).
-</p>
-<h5>Direct Connection information</h5>
 <div class="d-grid gap-3">
   <div class="input-group">
-    <span class="input-group-text" style="width: 6em;"><strong>
-      Base URL
-    </strong></span>
-    <span id="base-url" class="form-control"><code id="base-url">
-      http://<%= host %>.pax.tufts.edu:<%= port %>
-    </code></span>
-    <button class="btn btn-light far fa-copy copy-btn" type="button"
-      data-target="base-url" style="aspect-ratio: 1 / 1;"
-      title="Copy Base URL"></button>
+    <span class="input-group-text" style="width: 6em"
+      ><strong> Base URL </strong></span
+    >
+    <span class="form-control"
+      ><samp data-id="base-url"
+        >http://<%= host %>.pax.tufts.edu:<%= port %></samp
+      ></span
+    >
+    <button
+      class="btn btn-light copy-btn"
+      type="button"
+      data-target="base-url"
+      data-label="Base URL"
+      title="Copy Base URL"
+    >
+      <i class="far fa-fw fa-copy" aria-hidden="true"></i>
+      <span class="visually-hidden">Copy Base URL</span>
+    </button>
   </div>
-  <small class="form-text text-muted mt-n2">
-    The server address to configure in your client (usually as the
-    <code>base_url</code>/<code>apiBase</code> setting, often with
-    <code>/v1</code> appended).
-  </small>
   <div class="input-group">
-    <span class="input-group-text" style="width: 6em;"><strong>
-      Model ID
-    </strong></span>
-    <% if use_router == "0" %>
-    <span id="model-id" class="form-control"><code id="model-id">
-      <%= File.basename(model_file) %>
-    </code></span>
-    <button class="btn btn-light far fa-copy copy-btn" type="button"
-      data-target="model-id" style="aspect-ratio: 1 / 1;"
-      title="Copy Model ID"></button>
-    <% else %>
-    <span class="form-control text-muted">
-      Router mode: multiple models available, see <code>/v1/models</code>
-    </span>
-    <% end %>
-  </div>
-  <small class="form-text text-muted mt-n2">
-    The <code>model</code> name to send with each request. Some clients
-    require this even if the server only hosts one model.
-  </small>
-  <div class="input-group">
-        <span class="input-group-text" style="width: 6em;"><strong>
-      API Key
-    </strong></span>
-    <span id="api-key" class="form-control"><code id="api-key">
-      <%= password %></code>
-    </span>
-    <button class="btn btn-light far fa-copy copy-btn" type="button"
-      data-target="api-key" style="aspect-ratio: 1 / 1;"
-      title="Copy API Key"></button>
-  </div>
-  <small class="form-text text-muted mt-n2">
-    Sent as an <code>Authorization: Bearer</code> token (or
-    <code>apiKey</code>/<code>api_key</code> setting) to authenticate your
-    requests. Anyone with this key can use the server, so keep it private.
-  </small>
-</div>
-<hr />
-<div>
-  <h5>VS Code Connection Information</h5>
-  <p class="mb-1">
-    Copy this text and paste it in your <code>config.yaml</code> to use this
-    model in VS Code with <a href="https://continue.dev" target="_blank" rel="noopener">Continue.dev</a>.
-  </p>
-  <div class="input-group">
-    <pre id="continue-config" class="form-control" style="white-space: pre-wrap; margin-bottom: 0;">  - name: Tufts LLM Endpoint
-    provider: openai
-    model: <%= use_router == "0" ? File.basename(model_file) : "AUTODETECT" %>
-    apiBase: http://<%= host %>.pax.tufts.edu:<%= port %>/v1
-    apiKey: <%= password %>
-    roles:
-      - chat
-      - edit
-      - apply</pre>
-    <button class="btn btn-light far fa-copy copy-btn" type="button"
-      data-target="continue-config" style="aspect-ratio: 1 / 1;"
-      title="Copy Continue config"></button>
+    <span class="input-group-text" style="width: 6em"
+      ><strong> API Key </strong></span
+    >
+    <span class="form-control"
+      ><samp data-id="api-key"><%= password %></samp></span
+    >
+    <button
+      class="btn btn-light copy-btn"
+      type="button"
+      data-target="api-key"
+      data-label="API Key"
+      title="Copy API Key"
+    >
+      <i class="far fa-fw fa-copy" aria-hidden="true"></i>
+      <span class="visually-hidden">Copy API Key</span>
+    </button>
   </div>
 </div>
+
+<span class="visually-hidden" role="status" data-id="copy-status"></span>
+
+<p class="small text-danger mt-3 mb-0">
+  <i class="fa fa-warning" aria-hidden="true"></i>
+  API traffic unencrypted. Do not transmit sensitive information.
+</p>
+
 <hr />
+
+<!-- blank lines prevent redcarpet from rendering the following as markdown -->
+
 <div class="d-flex gap-2">
-  <a href="/rnode/<%= host %>/<%= port %>/"
-    class="btn btn-primary" id="launch-button">
-    <i class="fa fa-eye"></i> Launch Web UI
+  <a href="/rnode/<%= host %>/<%= port %>/" class="btn btn-primary launch-btn">
+    <i class="fa fa-eye" aria-hidden="true"></i> Launch Web UI
   </a>
-  <a href="/pun/sys/dashboard/files/fs/<%= output_log %>"
-    class="btn btn-secondary">
-    <i class="fa fa-file-text"></i> View Server Log
+  <a
+    href="/pun/sys/dashboard/files/fs/<%= output_log %>"
+    class="btn btn-secondary"
+  >
+    <i class="fa fa-file-text" aria-hidden="true"></i> View Server Log
   </a>
 </div>
 
+<p class="small text-muted mt-2 mb-0">
+  <i class="fa fa-info-circle" aria-hidden="true"></i>
+  Web UI stores chat history, uploads, settings, and API key in the browser.
+</p>
+
 <script>
-  document.getElementById('launch-button')
-    .addEventListener('mouseover', function() {
-      localStorage.setItem(
-        'LlamaCppWebui.config', '{"apiKey":"<%= password %>"}'
-      );
+  (() => {
+    const scope = document.currentScript.parentElement;
+    const launchBtn = scope.querySelector(".launch-btn");
+    const storeApiKey = function () {
+      let config = {};
+      try {
+        config = JSON.parse(localStorage.getItem("LlamaUi.config") || "{}");
+      } catch {
+        config = {};
+      }
+      config.apiKey = "<%= password %>";
+      localStorage.setItem("LlamaUi.config", JSON.stringify(config));
+    };
+    launchBtn.addEventListener("click", storeApiKey);
+    launchBtn.addEventListener("mousedown", storeApiKey);
+    launchBtn.addEventListener("touchstart", storeApiKey);
+    const status = scope.querySelector('[data-id="copy-status"]');
+    scope.querySelectorAll(".copy-btn").forEach((btn) => {
+      const icon = btn.querySelector("i");
+      const name = btn.getAttribute("data-label");
+      let timer;
+      const flash = function (iconClass, message) {
+        clearTimeout(timer);
+        icon.className = `far fa-fw ${iconClass}`;
+        status.textContent = message;
+        timer = setTimeout(() => {
+          icon.className = "far fa-fw fa-copy";
+          if (status.textContent === message) status.textContent = "";
+        }, 1500);
+      };
+      btn.addEventListener("click", async function () {
+        const targetId = btn.getAttribute("data-target");
+        try {
+          const code = scope
+            .querySelector(`[data-id="${targetId}"]`)
+            .textContent.trim();
+          await navigator.clipboard.writeText(code);
+          flash("fa-check-square", `Copied ${name}`);
+        } catch {
+          flash("fa-times-circle", `Could not copy ${name}`);
+        }
+      });
     });
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const targetId = btn.getAttribute('data-target');
-      const code = document.getElementById(targetId).innerText;
-      navigator.clipboard.writeText(code);
-      btn.classList.remove('fa-copy');
-      btn.classList.add('fa-check-square');
-      setTimeout(() => {
-        btn.classList.remove('fa-check-square');
-        btn.classList.add('fa-copy');
-      }, 1500);
-    });
-  });
+  })();
 </script>

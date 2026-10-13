@@ -1,6 +1,14 @@
 # <% require "json" %>
+# <% require "securerandom" %>
 ---
 cluster: "pax"
+
+# <% read_local = ->(path) { File.read(File.join(__dir__, path)) } %>
+
+form_header: |
+<%= read_local.call("partials/data-retention.html").rstrip.indent(2) %>
+<%= read_local.call("partials/ai-disclaimer.html").rstrip.indent(2) %>
+  <h4>Job Configuration</h4>
 
 form:
   - "num_hours"
@@ -14,7 +22,11 @@ form:
   - "exact_vram"
   - "gpu_model"
   - "num_gpu"
+  - "advanced_scheduling"
+  - "priority_start"
   - "allow_preempt"
+  - "extra_partitions"
+  - "slurm_reservation"
   - "use_router"
   - "use_default_models"
   - "models_dir"
@@ -25,26 +37,9 @@ form:
   - "mmproj_file"
   - "use_random_key"
   - "api_key"
-  - "ctx_size"
-  - "n_predict"
-  - "advanced_options"
-  - "batch_size"
-  - "ubatch_size"
-  - "specify_rope"
-  - "rope_scaling"
-  - "rope_scale"
-  - "rope_freq_base"
-  - "specify_yarn"
-  - "yarn_orig_ctx"
-  - "yarn_ext_factor"
-  - "yarn_attn_factor"
-  - "yarn_beta_slow"
-  - "yarn_beta_fast"
-  - "kv_offload"
-  - "cache_type_k"
-  - "cache_type_v"
-  - "gpu_layers"
-  - "n_gpu_layers"
+  - "llama_version"
+
+# <% max_hours = 48 %>
 
 attributes:
   num_hours:
@@ -52,20 +47,21 @@ attributes:
     label: "Hours"
     cacheable: false
     required: true
-    help: |
+    help: >-
       Upper limit for the job runtime in hours.
       Jobs exceeding this limit will be terminated.
       Higher values might delay job start.
-      Maximum allowed runtime is 48 hours.
+      Maximum allowed runtime is <%= max_hours %> hours.
     value: 1
     min: 1
-    max: 48
+    max: <%= max_hours %>
     step: 1
 
   use_preset:
     widget: "select"
     label: "Resource Preference"
-    help: |
+    cacheable: false
+    help: >-
       Ensure the selected configuration is possible if not using presets.
       Consult the [system status dashboard](/pun/sys/dashboard/system-status)
       for node configuration details and current resource availability.
@@ -75,61 +71,64 @@ attributes:
           "Use Resource Presets (Recommended)",
           "1",
           {
-              data-hide-allow-preempt: true,
-              data-hide-exact-vram: true,
-              data-hide-gpu-model: true,
-              data-hide-gpu-preference: true,
-              data-hide-memory-ram: true,
-              data-hide-min-vram: true,
-              data-hide-num-cores: true,
-              data-hide-num-gpu: true,
-            },
+            data-hide-exact-vram: true,
+            data-hide-gpu-model: true,
+            data-hide-gpu-preference: true,
+            data-hide-memory-ram: true,
+            data-hide-min-vram: true,
+            data-hide-num-cores: true,
+            data-hide-num-gpu: true,
+          },
         ]
       - [
           "Manually Specify Configuration (Advanced)",
           "0",
           {
-              data-hide-exact-vram: true,
-              data-hide-gpu-model: true,
-              data-hide-min-vram: true,
-              data-hide-num-gpu: true,
-              data-hide-preset-multiplier: true,
-              data-hide-resource-preset: true,
-              data-set-gpu-preference: "none",
-            },
+            data-hide-exact-vram: true,
+            data-hide-gpu-model: true,
+            data-hide-min-vram: true,
+            data-hide-num-gpu: true,
+            data-hide-preset-multiplier: true,
+            data-hide-resource-preset: true,
+            data-set-gpu-preference: "none",
+          },
         ]
 
   resource_preset:
     widget: "select"
     label: "Resource Preset"
     cacheable: false
-    help: |
+    help: >-
       Choose a preset that accommodates the model you are planning on using.
       Models that can completely fit into VRAM will have optimal performance.
       Models that exceed the combined total of RAM and VRAM cannot be used.
       Preset values can be multiplied below if more resources are needed.
       Jobs that request more resources take longer to start.
-    value: "a100-40G/96/4"
+    value: "a100-40G/94/4"
     options:
       - [
-          "A100 GPU / 40 GB VRAM / 96 GB RAM / 4 CPU",
-          "a100-40G/96/4",
-          { data-max-preset-multiplier: 8 },
-        ]
-
-      - [
-          "A100 GPU / 40 GB VRAM / 128 GB RAM / 8 CPU",
-          "a100-40G/128/8",
+          "A100 GPU / 40 GB VRAM / 94 GB RAM / 4 CPU",
+          "a100-40G/94/4",
           { data-max-preset-multiplier: 8 },
         ]
       - [
-          "L40S GPU / 48 GB VRAM / 128 GB RAM / 16 CPU",
-          "l40s/128/16",
+          "L40S GPU / 48 GB VRAM / 125 GB RAM / 16 CPU",
+          "l40s-48G/125/16",
           { data-max-preset-multiplier: 4 },
         ]
       - [
-          "H200 GPU / 140 GB VRAM / 196 GB RAM / 12 CPU",
-          "h200/196/12",
+          "A100 GPU / 80 GB VRAM / 125 GB RAM / 8 CPU",
+          "a100-80G/125/8",
+          { data-max-preset-multiplier: 8 },
+        ]
+      - [
+          "RTX PRO 6000 GPU / 96 GB VRAM / 125 GB RAM / 16 CPU",
+          "rtx_pro_6000-96G/125/16",
+          { data-max-preset-multiplier: 8 },
+        ]
+      - [
+          "H200 GPU / 141 GB VRAM / 187 GB RAM / 12 CPU",
+          "h200-141G/187/12",
           { data-max-preset-multiplier: 8 },
         ]
 
@@ -138,11 +137,11 @@ attributes:
     label: "Preset Multiplier"
     cacheable: false
     required: true
-    help: |
-      Multiplies the resources of the selected preset by the this value.
-      For example, the preset "A100 GPU / 40 GB VRAM / 128 GB RAM / 8 CPU"
+    help: >-
+      Multiplies the resources of the selected preset by this value.
+      For example, the preset "A100 GPU / 40 GB VRAM / 94 GB RAM / 4 CPU"
       with a multiplier of two (2) results in two A100 GPUs, 80 GB VRAM,
-      256 GB RAM, and 16 CPU cores. The maximum allowed multiplier is four (4)
+      188 GB RAM, and 8 CPU cores. The maximum allowed multiplier is four (4)
       for the L40S preset and eight (8) for all other presets.
     value: 1
     min: 1
@@ -171,30 +170,30 @@ attributes:
     widget: "select"
     label: "Memory (RAM)"
     cacheable: false
-    help: |
+    help: >-
       RAM is used when no GPU is selected or when the whole model cannot fit
       into VRAM. Higher values increase performance but might delay job start.
     value: "8g"
     options:
-      - [ "8 GB", "8g" ]
-      - [ "16 GB", "16g" ]
-      - [ "32 GB", "32g" ]
-      - [ "64 GB", "64g" ]
-      - [ "96 GB", "96g" ]
-      - [ "128 GB", "128g" ]
-      - [ "192 GB", "192g" ]
-      - [ "256 GB", "256g" ]
-      - [ "384 GB", "384g" ]
-      - [ "512 GB", "512g" ]
-      - [ "768 GB", "768g" ]
-      - [ "1024 GB", "1024g" ]
-      - [ "1536 GB", "1536g" ]
+      - ["8 GB", "8g"]
+      - ["16 GB", "16g"]
+      - ["32 GB", "32g"]
+      - ["64 GB", "64g"]
+      - ["96 GB", "96g"]
+      - ["128 GB", "128g"]
+      - ["192 GB", "192g"]
+      - ["256 GB", "256g"]
+      - ["384 GB", "384g"]
+      - ["512 GB", "512g"]
+      - ["768 GB", "768g"]
+      - ["1024 GB", "1024g"]
+      - ["1536 GB", "1536g"]
 
   gpu_preference:
     widget: "select"
     label: "GPU Preference"
     cacheable: false
-    help: |
+    help: >-
       Not selecting a GPU decreases performance but might allow your job to
       start sooner. Optimal performance requires total VRAM that can fit the
       entire model and batch size.
@@ -204,20 +203,20 @@ attributes:
           "No GPU (No VRAM)",
           "none",
           {
-              data-hide-exact-vram: true,
-              data-hide-gpu-model: true,
-              data-hide-min-vram: true,
-              data-hide-num-gpu: true,
-            },
+            data-hide-exact-vram: true,
+            data-hide-gpu-model: true,
+            data-hide-min-vram: true,
+            data-hide-num-gpu: true,
+          },
         ]
       - [
           "Any GPU (≥ 16 GB VRAM)",
           "any",
           {
-              data-hide-exact-vram: true,
-              data-hide-gpu-model: true,
-              data-hide-min-vram: true,
-            },
+            data-hide-exact-vram: true,
+            data-hide-gpu-model: true,
+            data-hide-min-vram: true,
+          },
         ]
       - [
           "Minimum VRAM Requirement",
@@ -241,115 +240,164 @@ attributes:
     widget: "select"
     label: "Minimum VRAM"
     cacheable: false
-    help: |
+    help: >-
       Automatically select a GPU with VRAM equaling or exceeding the
       selected option. Higher values might delay job start.
-    value: "<%= min_vram_options.first.last %>"
-    options: <%= JSON.generate(min_vram_options) %>
+    value: "<%= GpuConfig.min_vram_options.first.last %>"
+    options: <%= JSON.generate(GpuConfig.min_vram_options) %>
 
   exact_vram:
     widget: "select"
     label: "Exact VRAM"
     cacheable: false
-    help: |
+    help: >-
       Automatically select a GPU with exactly the selected VRAM.
       Subject to GPU availability.
-    value: "<%= exact_vram_options.first.last %>"
-    options: <%= JSON.generate(exact_vram_options) %>
+    value: "<%= GpuConfig.exact_vram_options.first.last %>"
+    options: <%= JSON.generate(GpuConfig.exact_vram_options) %>
 
   gpu_model:
     widget: "select"
     label: "GPU Model (VRAM)"
     cacheable: false
-    help: |
+    help: >-
       Only use if a specific GPU model is required.
       Might delay job start due to GPU availability.
-    value: "<%= gpu_model_options.first.last %>"
-    options: <%= JSON.generate(gpu_model_options) %>
+    value: "<%= GpuConfig.gpu_model_options.first.last %>"
+    options: <%= JSON.generate(GpuConfig.gpu_model_options) %>
 
   num_gpu:
     widget: "number_field"
     label: "Number of GPUs"
     cacheable: false
     required: true
-    help: |
-      Number of multiples of the selected GPU to use. Total VRAM equals the
-      selected VRAM multiplied by this number. Higher values might delay job
-      start. Up to 8 GPUs possible.
+    help: >-
+      Number of the selected GPU to request. Total VRAM equals the selected
+      VRAM multiplied by this number. Higher values might delay job start.
+      Up to 8 GPUs possible.
     value: 1
     min: 1
     max: 8
     step: 1
 
+  advanced_scheduling:
+    widget: "check_box"
+    label: "Use Advanced Scheduling Options"
+    cacheable: true
+    help: >-
+      Configure priority start, preemption, additional partitions,
+      and reservations.
+    html_options:
+      data:
+        hide-allow-preempt-when-un-checked: true
+        hide-extra-partitions-when-un-checked: true
+        hide-priority-start-when-un-checked: true
+        hide-slurm-reservation-when-un-checked: true
+
+  priority_start:
+    widget: "check_box"
+    label: "Request Priority Start"
+    cacheable: false
+    help: >-
+      Ask to skip the queue and start as soon as possible. Limited to a single
+      priority job at a time and a maximum runtime of 4 hours. Submission will
+      fail if either limit is exceeded.
+
   allow_preempt:
     widget: "check_box"
     label: "Allow Preemption"
     cacheable: false
-    help: |
-      Gain access to reserved resources and potentially start the job sooner
-      by allowing your job to be preempted (terminated without warning) if
-      higher-priority jobs need resources.
+    help: >-
+      Gain access to idle reserved resources and potentially start sooner
+      by allowing your job to be preempted (terminated without warning)
+      if higher-priority jobs need resources.
+
+  # <% csv_regex = '^\s*[A-Za-z0-9_\-\.]+(\s*,\s*[A-Za-z0-9_\-\.]+)*\s*$' %>
+
+  extra_partitions:
+    widget: "text_field"
+    label: "Additional Partitions"
+    cacheable: true
+    help: "Comma-separated list of partitions to consider alongside defaults."
+    pattern: '<%= csv_regex %>'
+    html_options:
+      class: "font-monospace"
+
+  slurm_reservation:
+    widget: "text_field"
+    label: "Slurm Reservations"
+    cacheable: false
+    help: "Comma-separated list of reservations to consider."
+    pattern: '<%= csv_regex %>'
+    html_options:
+      class: "font-monospace"
 
   # <% load File.join(__dir__, "lib/model_discovery.rb") %>
-  # <% models_dir = "/cluster/tufts/datasets/ai/models/gguf" %>
-  # <% models = discover_models(models_dir) %>
+  # <% models_dir = "/cluster/tufts/datasets/ai/models/inference/gguf" %>
+  # <% models = ModelDiscovery.discover(models_dir) %>
+  # <% default_model = models.default_entry %>
 
   use_router:
     widget: "select"
     label: "Server Mode"
-    value: "1"
-    help: |
+    value: "0"
+    help: >-
       Router mode is *experimental* and allows for the dynamic loading and
       unloading of multiple models from a specified directory. Classic mode
       preloads a single specified model that cannot be changed without
       cancelling the job and submitting a new one.
     options:
       - [
-          "Router (Multi-Model)",
-          "1",
-          {
-              data-hide-mmproj-file: true,
-              data-hide-model-file: true,
-              data-hide-model-selection: true,
-              data-hide-models-dir: true,
-              data-hide-models-ini: true,
-              data-hide-use-custom-model: true,
-              data-set-mmproj-file: "<%= models.first_mmproj_path %>",
-              data-set-model-file: "<%= models.first_model_path %>",
-              data-set-model-selection: "<%= models.first_model_path %>",
-            },
-        ]
-      - [
           "Classic (Single-Model)",
           "0",
           {
-              data-hide-mmproj-file: true,
-              data-hide-model-file: true,
-              data-hide-models-dir: true,
-              data-hide-models-ini: true,
-              data-hide-use-default-models: true,
-              data-set-models-dir: "<%= models_dir %>",
-              data-set-use-custom-model: "0",
-              data-set-use-default-models: "1",
-            },
+            data-hide-mmproj-file: true,
+            data-hide-model-file: true,
+            data-hide-models-dir: true,
+            data-hide-models-ini: true,
+            data-hide-use-default-models: true,
+            data-set-models-dir: "<%= models_dir %>",
+            data-set-models-ini: "",
+            data-set-use-custom-model: "0",
+            data-set-use-default-models: "1",
+          },
+        ]
+      - [
+          "Router (Multi-Model)",
+          "1",
+          {
+            data-hide-mmproj-file: true,
+            data-hide-model-file: true,
+            data-hide-model-selection: true,
+            data-hide-models-dir: true,
+            data-hide-models-ini: true,
+            data-hide-use-custom-model: true,
+            data-set-mmproj-file: "<%= default_model[:mmproj_path] %>",
+            data-set-model-file: "<%= default_model[:model_path] %>",
+            data-set-model-selection: "<%= default_model[:model_path] %>",
+            data-set-models-dir: "<%= models_dir %>",
+            data-set-models-ini: "",
+            data-set-use-default-models: "1",
+          },
         ]
 
   use_default_models:
     widget: "select"
     label: "Model Set"
+    cacheable: false
     value: "1"
-    help: |
+    help: >-
       The default set contains a curated selection of pre-downloaded models.
     options:
       - [
           "Default (Recommended)",
           "1",
           {
-              data-hide-models-dir: true,
-              data-hide-models-ini: true,
-              data-set-models-dir: "<%= models_dir %>",
-              data-set-models-ini: "",
-            },
+            data-hide-models-dir: true,
+            data-hide-models-ini: true,
+            data-set-models-dir: "<%= models_dir %>",
+            data-set-models-ini: "",
+          },
         ]
       - [
           "Custom (Advanced)",
@@ -360,10 +408,13 @@ attributes:
   models_dir:
     widget: "text_field"
     label: "Models Directory"
+    cacheable: false
     help: |
       <p style="margin-bottom: 0">
         Path to a directory containing model files in GGUF format. Refer to the
-        <a href="https://github.com/ggml-org/llama.cpp/tree/master/tools/server#model-sources">
+        <a
+          href="https://github.com/ggml-org/llama.cpp/tree/master/tools/server#model-sources"
+        >
           LLaMA CPP Server documentation
         </a>
         for the expected directory structure and file naming conventions.
@@ -379,14 +430,19 @@ attributes:
     value: "<%= models_dir %>"
     pattern: |-
       ^/(cluster/(tufts|home)/[A-Za-z0-9_\-\.]+(/[A-Za-z0-9_\-\.]+)*)/?$
+    html_options:
+      class: "font-monospace"
 
   models_ini:
     widget: "text_field"
     label: "Model Presets File"
+    cacheable: false
     help: |
       <p style="margin-bottom: 0">
         Path to an INI file defining model presets. Refer to the
-        <a href="https://github.com/ggml-org/llama.cpp/tree/master/tools/server#model-presets">
+        <a
+          href="https://github.com/ggml-org/llama.cpp/tree/master/tools/server#model-presets"
+        >
           LLaMA CPP Server documentation
         </a>
         for the required file structure, example content, and preset options.
@@ -402,42 +458,51 @@ attributes:
     value: ""
     pattern: |-
       ^/(cluster/(tufts|home)/[A-Za-z0-9_\-\.]+(/[A-Za-z0-9_\-\.]+)*)\.ini$
+    html_options:
+      class: "font-monospace"
 
   use_custom_model:
     widget: "select"
     label: "Model Preference"
+    cacheable: false
     value: "0"
     options:
       - [
           "Select Pre-Downloaded Model (Recommended)",
           "0",
           {
-              data-hide-mmproj-file: true,
-              data-hide-model-file: true,
-              data-set-mmproj-file: "<%= models.first_mmproj_path %>",
-              data-set-model-file: "<%= models.first_model_path %>",
-              data-set-model-selection: "<%= models.first_model_path %>",
-            },
+            data-hide-mmproj-file: true,
+            data-hide-model-file: true,
+            data-set-mmproj-file: "<%= default_model[:mmproj_path] %>",
+            data-set-model-file: "<%= default_model[:model_path] %>",
+            data-set-model-selection: "<%= default_model[:model_path] %>",
+          },
         ]
       - [
           "Manually Specify Custom Model File (Advanced)",
           "1",
           {
-              data-hide-model-selection: true,
-              data-set-mmproj-file: "",
-              data-set-model-file: "",
-            },
+            data-hide-model-selection: true,
+            data-set-mmproj-file: "",
+            data-set-model-file: "",
+          },
         ]
 
   model_selection:
     widget: "select"
     label: "Pre-Downloaded Model"
-    value: "<%= models.first_model_path %>"
+    cacheable: false
+    help: >-
+      Selected VRAM/RAM should exceed the displayed model size by several GB.
+    value: "<%= default_model[:model_path] %>"
     options: <%= JSON.generate(models.options) %>
+
+  # <% gguf_regex = '^/(cluster/(tufts|home)/[A-Za-z0-9_\-\.]+(/[A-Za-z0-9_\-\.]+)*)\.gguf$' %>
 
   model_file:
     widget: "text_field"
     label: "Model File"
+    cacheable: false
     required: true
     help: |
       <p style="margin-bottom: 0">
@@ -446,39 +511,56 @@ attributes:
         and ensure all related files are in the same directory.
       </p>
       <ul>
-        <li><code>/cluster/home/<%= ENV['USER'] %>/.../&lt;model&gt;[-00001-of-?????].gguf</code></li>
-        <li><code>/cluster/tufts/&lt;project&gt;/.../&lt;model&gt;[-00001-of-?????].gguf</code></li>
+        <li>
+          <code
+            >/cluster/home/<%= ENV['USER']
+            %>/.../&lt;model&gt;[-00001-of-?????].gguf</code
+          >
+        </li>
+        <li>
+          <code
+            >/cluster/tufts/&lt;project&gt;/.../&lt;model&gt;[-00001-of-?????].gguf</code
+          >
+        </li>
       </ul>
-    value: "<%= models.first_model_path %>"
-    pattern: |-
-      ^/(cluster/(tufts|home)/[A-Za-z0-9_\-\.]+(/[A-Za-z0-9_\-\.]+)*)\.gguf$
+    value: "<%= default_model[:model_path] %>"
+    pattern: <%= gguf_regex %>
+    html_options:
+      class: "font-monospace"
 
   mmproj_file:
     widget: "text_field"
     label: "Multi-Modal Projector"
+    cacheable: false
     help: |
-      <p style="margin-bottom: 0;">
+      <p style="margin-bottom: 0">
         Path to a multi-modal projector (MMProj) file in GGUF format.
         Needed for multi-modal capabilities for supported models and
         usually distributed alongside the model file(s).
       </p>
       <ul>
-        <li><code>/cluster/home/<%= ENV['USER'] %>/.../mmproj-&lt;dtype&gt;.gguf</code></li>
-        <li><code>/cluster/tufts/&lt;project&gt;/.../mmproj-&lt;dtype&gt;.gguf</code></li>
+        <li>
+          <code>/cluster/home/<%= ENV['USER'] %>/.../mmproj-&lt;dtype&gt;.gguf</code>
+        </li>
+        <li>
+          <code>/cluster/tufts/&lt;project&gt;/.../mmproj-&lt;dtype&gt;.gguf</code>
+        </li>
       </ul>
-    value: "<%= models.first_mmproj_path %>"
-    pattern: |-
-      ^/(cluster/(tufts|home))(?:/[A-Za-z0-9_\-\.]+)*/mmproj-[A-Za-z0-9_-]+\.gguf$
+    value: "<%= default_model[:mmproj_path] %>"
+    pattern: <%= gguf_regex %>
+    html_options:
+      class: "font-monospace"
 
   # <% key_len = 32 %>
-  # <% api_key = Array.new(key_len){[*'0'..'9', *'A'..'Z', *'a'..'z'].sample}.join %>
+  # <% api_key = SecureRandom.alphanumeric(key_len) %>
 
   use_random_key:
     widget: "select"
     label: "API Key Preference"
     cacheable: false
-    help: |
-      The key will be displayed on the job information card after job start.
+    help: >-
+      Used to authenticate server requests.
+      Will be displayed on the job information card.
     value: "1"
     options:
       - [
@@ -486,252 +568,31 @@ attributes:
           "1",
           { data-hide-api-key: true, data-set-api-key: "<%= api_key %>" },
         ]
-      - [ "Manually Specify API Key (Advanced)", "0", { data-set-api-key: "" } ]
+      - ["Manually Specify API Key (Advanced)", "0", { data-set-api-key: "" }]
 
   api_key:
     widget: "text_field"
     label: "API Key"
     cacheable: false
     required: true
-    help: |
-      Must be difficult to guess and consist of at least <%= key_len %>
-      alphanumeric `[a-zA-Z0-9]` characters. **Anyone with the API key can
-      access the server along with any data sent to it.**
+    help: >-
+      Must be at least <%= key_len %> characters.
+      Only letters and numbers allowed. Case sensitive.
     value: "<%= api_key %>"
     pattern: "^[a-zA-Z0-9]{<%= key_len %>,}$"
+    html_options:
+      class: "font-monospace"
 
-  ctx_size:
-    widget: "number_field"
-    label: "Context Size"
-    required: true
-    help: "Size of the prompt context. Set to `0` to use model default."
-    value: 0
-    min: 0
-    step: 1
+  # <% load File.join(__dir__, "lib/module_versions.rb") %>
+  # <% llama_versions = ModuleVersions.list("/cluster/tufts/apps/container/ai/modules/llama.cpp") %>
 
-  n_predict:
-    widget: "number_field"
-    label: "Tokens to Predict"
-    required: true
-    help: "Number of tokens to predict. Set to `-1` for infinity."
-    value: -1
-    min: -1
-    step: 1
-
-  advanced_options:
-    widget: "check_box"
-    label: "Show Advanced Options"
+  llama_version:
+    widget: "select"
+    label: "LLaMA CPP Version"
     cacheable: false
-    help: |
-      Enable to show additional advanced server options: batch size,
-      RoPE/YaRN scaling, KV cache data types, and GPU offload strategy.
-    value: "0"
-    data-hide-batch-size-when-unchecked: true
-    data-hide-ubatch-size-when-unchecked: true
-    data-hide-specify-rope-when-unchecked: true
-    data-hide-rope-scaling-when-unchecked: true
-    data-hide-rope-scale-when-unchecked: true
-    data-hide-rope-freq-base-when-unchecked: true
-    data-hide-specify-yarn-when-unchecked: true
-    data-hide-yarn-orig-ctx-when-unchecked: true
-    data-hide-yarn-ext-factor-when-unchecked: true
-    data-hide-yarn-attn-factor-when-unchecked: true
-    data-hide-yarn-beta-slow-when-unchecked: true
-    data-hide-yarn-beta-fast-when-unchecked: true
-    data-hide-kv-offload-when-unchecked: true
-    data-hide-cache-type-k-when-unchecked: true
-    data-hide-cache-type-v-when-unchecked: true
-    data-hide-gpu-layers-when-unchecked: true
-    data-hide-n-gpu-layers-when-unchecked: true
-
-  batch_size:
-    widget: "number_field"
-    label: "Logical Batch Size"
-    required: true
-    help: "Logical maximum batch size."
-    value: 2048
-    min: 1
-    step: 1
-
-  ubatch_size:
-    widget: "number_field"
-    label: "Physical Batch Size"
-    required: true
-    help: "Physical maximum batch size."
-    value: 512
-    min: 1
-    step: 1
-
-  specify_rope:
-    widget: "select"
-    label: "RoPE Parameters"
-    value: "0"
-    options:
-      - [
-          "Use Defaults (Recommended)",
-          "0",
-          {
-              data-hide-rope-scaling: true,
-              data-hide-rope-scale: true,
-              data-hide-rope-freq-base: true,
-              data-hide-specify-yarn: true,
-              data-hide-yarn-orig-ctx: true,
-              data-hide-yarn-ext-factor: true,
-              data-hide-yarn-attn-factor: true,
-              data-hide-yarn-beta-slow: true,
-              data-hide-yarn-beta-fast: true,
-            },
-        ]
-      - [
-          "Manually Specify (Advanced)",
-          "1",
-          {
-              data-set-rope-scaling: "none",
-              data-hide-rope-scale: true,
-              data-hide-rope-freq-base: true,
-              data-hide-specify-yarn: true,
-              data-hide-yarn-orig-ctx: true,
-              data-hide-yarn-ext-factor: true,
-              data-hide-yarn-attn-factor: true,
-              data-hide-yarn-beta-slow: true,
-              data-hide-yarn-beta-fast: true,
-            },
-        ]
-
-  rope_scaling:
-    widget: "select"
-    label: "RoPE Frequency Scaling Method"
-    value: "none"
-    options:
-      - [
-          "None",
-          "none",
-          {
-              data-hide-rope-scale: true,
-              data-hide-rope-freq-base: true,
-              data-hide-specify-yarn: true,
-              data-hide-yarn-orig-ctx: true,
-              data-hide-yarn-ext-factor: true,
-              data-hide-yarn-attn-factor: true,
-              data-hide-yarn-beta-slow: true,
-              data-hide-yarn-beta-fast: true,
-            },
-        ]
-      - [
-          "Linear",
-          "linear",
-          {
-              data-hide-specify-yarn: true,
-              data-hide-yarn-orig-ctx: true,
-              data-hide-yarn-ext-factor: true,
-              data-hide-yarn-attn-factor: true,
-              data-hide-yarn-beta-slow: true,
-              data-hide-yarn-beta-fast: true,
-            },
-        ]
-      - [
-          "YaRN",
-          "yarn",
-          {
-              data-hide-yarn-orig-ctx: true,
-              data-hide-yarn-ext-factor: true,
-              data-hide-yarn-attn-factor: true,
-              data-hide-yarn-beta-slow: true,
-              data-hide-yarn-beta-fast: true,
-              data-set-specify-yarn: "0",
-            },
-        ]
-
-  rope_scale:
-    widget: "number_field"
-    label: "RoPE Context Scaling Factor"
-    min: 1
-    step: 0.01
-
-  rope_freq_base:
-    widget: "number_field"
-    label: "RoPE Base Frequency"
-    min: 1
-    step: 1
-
-  specify_yarn:
-    widget: "check_box"
-    label: "Specify YaRN Parameters"
-    value: "0"
-    data-hide-yarn-orig-ctx-when-unchecked: true
-    data-hide-yarn-ext-factor-when-unchecked: true
-    data-hide-yarn-attn-factor-when-unchecked: true
-    data-hide-yarn-beta-slow-when-unchecked: true
-    data-hide-yarn-beta-fast-when-unchecked: true
-
-  yarn_orig_ctx:
-    widget: "number_field"
-    label: "YaRN Original Context Size"
-    help: "Set to `0` to use model training context size."
-    value: 0
-    min: 0
-    step: 1
-
-  yarn_ext_factor:
-    widget: "number_field"
-    label: "YaRN Extrapolation Mix Factor"
-    help: |
-      Must be between `0` (full interpolation) and `1` (full extrapolation).
-    min: 0
-    step: 0.01
-    max: 1
-
-  yarn_attn_factor:
-    widget: "number_field"
-    label: "YaRN Scale Attention Magnitude"
-    min: 0
-    step: 0.01
-
-  yarn_beta_slow:
-    widget: "number_field"
-    label: "YaRN High Correction Dimension (Alpha)"
-    min: 0
-    step: 0.01
-
-  yarn_beta_fast:
-    widget: "number_field"
-    label: "YaRN Low Correction Dimension (Beta)"
-    min: 0
-    step: 0.01
-
-  kv_offload:
-    widget: "check_box"
-    label: "Enable KV Cache Offloading"
-    value: "1"
-
-  # <% cache_type_options = ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"] %>
-  # <% cache_type_default = "f16" %>
-
-  cache_type_k:
-    widget: "select"
-    label: "KV Cache Data Type for Keys"
-    value: "<%= cache_type_default %>"
-    options: <%= JSON.generate(cache_type_options) %>
-
-  cache_type_v:
-    widget: "select"
-    label: "KV Cache Data Type for Values"
-    value: "<%= cache_type_default %>"
-    options: <%= JSON.generate(cache_type_options) %>
-
-  gpu_layers:
-    widget: "select"
-    label: "GPU Offload Strategy"
-    value: "auto"
-    options:
-      - [ "Automatic", "auto", { data-hide-n-gpu-layers: true } ]
-      - [ "Offload All Layers", "all", { data-hide-n-gpu-layers: true } ]
-      - [ "Manually Specify Number Layers to Offload", "manual" ]
-
-  n_gpu_layers:
-    widget: "number_field"
-    label: "Number of Layers to Offload to GPU"
-    required: true
-    value: 0
-    min: 0
-    step: 1
+    help: >-
+      The latest version (default) includes bug fixes and support for newer
+      models. Use an older version only to reproduce earlier results or when
+      a model or workflow requires it.
+    value: "<%= llama_versions.first %>"
+    options: <%= JSON.generate(llama_versions) %>
